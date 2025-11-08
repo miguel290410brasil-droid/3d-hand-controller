@@ -4,6 +4,7 @@ const container = document.getElementById('container-3d');
 let scene, camera, renderer, gridHelper, handMesh, cubes = [];
 const RAYCASTER = new THREE.Raycaster();
 const HAND_RADIUS = 0.5; // Raio da esfera que representa a mão
+let cameraMediaPipe; // Variável global para o CameraUtils do MediaPipe
 
 function initThreeJS() {
     // 1. Cena e Câmera
@@ -78,7 +79,6 @@ function animate() {
 // --- 2. CONFIGURAÇÃO DO RASTREAMENTO DE MÃO (MEDIAPIPE) ---
 
 const videoElement = document.getElementById('webcam-feed');
-const ASPECT_RATIO_CORRECTION = 0.5; // Ajuste para mapear de 2D para 3D
 
 // Configuração e inicialização do MediaPipe Hands
 const hands = new Hands({
@@ -96,8 +96,9 @@ hands.setOptions({
 
 hands.onResults(onResults); // Função chamada a cada quadro com resultados
 
-// Inicia a câmera e o loop de processamento do MediaPipe
-const cameraMediaPipe = new Camera(videoElement, {
+// 🟢 INICIALIZAÇÃO CORRIGIDA DO CAMERA UTILS
+// A classe 'Camera' é fornecida pela biblioteca 'camera_utils.js' carregada no index.html
+cameraMediaPipe = new Camera(videoElement, {
     onFrame: async () => {
         await hands.send({ image: videoElement });
     },
@@ -114,27 +115,23 @@ function onResults(results) {
         handMesh.visible = true;
         const handLandmarks = results.multiHandLandmarks[0];
         
-        // 8 é o índice da ponta do dedo indicador no modelo MediaPipe
+        // 8 é o índice da ponta do dedo indicador
         const tipIndexFinger = handLandmarks[8];
         
-        // Mapeamento das coordenadas 2D (0 a 1) para a Cena 3D
-        // Usamos a câmera para posicionar a mão de forma relativa à visualização
-        
-        // O valor X (horizontal) é invertido, pois a webcam está espelhada
-        const screenX = 1 - tipIndexFinger.x; 
+        // Mapeamento das coordenadas 2D (do vídeo) para coordenadas 3D (do mundo Three.js)
+        const screenX = 1 - tipIndexFinger.x; // Inverte X (webcam espelhada)
         const screenY = tipIndexFinger.y;
 
-        // Converter coordenadas 2D (do vídeo) para coordenadas 3D (do mundo Three.js)
         const vector = new THREE.Vector3(
             (screenX * 2 - 1) * 8, // Escala o X para a cena (-8 a 8)
             (1 - screenY) * 6,     // Escala o Y para a cena (0 a 6)
-            0                      // Profundidade padrão
+            0                      // Profundidade (fixamos em 0)
         );
 
         // Atualiza a posição da Mão Virtual
         handMesh.position.lerp(vector, 0.5); // Movimento suave (lerp)
         
-        // Lógica de Pegar (Grab/Pinch) - Verificamos se o polegar e o indicador estão juntos (índices 4 e 8)
+        // Lógica de Pegar (Grab/Pinch) - Distância entre polegar (4) e indicador (8)
         const tipThumb = handLandmarks[4];
         const distance = Math.hypot(tipIndexFinger.x - tipThumb.x, tipIndexFinger.y - tipThumb.y);
         const isGrabbing = distance < 0.05; // Distância limite para "pegar"
@@ -143,7 +140,7 @@ function onResults(results) {
 
     } else {
         handMesh.visible = false;
-        // Solta qualquer cubo que estava sendo segurado quando a mão some
+        // Solta qualquer cubo que estava sendo segurado
         cubes.forEach(cube => {
             if (cube.isGrabbed) {
                 cube.isGrabbed = false;
@@ -176,11 +173,11 @@ function handleCubeInteraction(isGrabbing) {
             }
         }
     } else {
-        // Verifica se algum cubo foi solto (solta todos, por segurança)
+        // Garante que o cubo solto volte à cor original
         cubes.forEach(cube => {
             if (cube.isGrabbed) {
                 cube.isGrabbed = false;
-                cube.material.color.setHex(cube.initialColor); // Retorna à cor original
+                cube.material.color.setHex(cube.initialColor); 
             }
         });
     }
