@@ -1,152 +1,160 @@
-<!DOCTYPE html>
-<html lang="pt-br">
+<!doctype html>
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Hand Controller - Webcam e Scripting</title>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/addons/p5.sound.min.js"></script>
-    <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
+  <meta charset="utf-8" />
+  <title>Hand Controller - index</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    html,body{height:100%;margin:0;background:#111;color:#eee;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;}
+    .wrap{display:flex;gap:14px;padding:14px;align-items:flex-start}
+    .video-wrap{position:relative}
+    video,canvas{border-radius:8px;background:#000;display:block}
+    #video{width:640px;height:480px;transform:scaleX(-1)}
+    #overlay{position:absolute;left:0;top:0}
+    .ui{width:320px}
+    button{display:block;padding:8px 12px;margin:8px 0}
+    pre{background:#222;padding:8px;border-radius:6px;max-height:320px;overflow:auto}
+    label{display:flex;align-items:center;gap:8px;margin:6px 0}
+    small{opacity:0.8}
+  </style>
 
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-            background-color: #AAAAAA; /* Fundo Cinza (Nível Body) */
-        }
-        /* Estilo para a webcam no canto superior direito */
-        #webcam {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            width: 160px;
-            height: 120px;
-            z-index: 10;
-            border: 2px solid white;
-            transform: scaleX(-1); /* Espelha o vídeo para ser intuitivo */
-        }
-        canvas {
-            display: block;
-        }
-    </style>
+  <!-- MediaPipe (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.min.js"></script>
 </head>
 <body>
+  <div class="wrap">
+    <div class="video-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="overlay" width="640" height="480"></canvas>
+    </div>
 
-    <script>
-        // Variáveis globais
-        let handpose;
-        let video;
-        let predictions = [];
-        let boxPosition = { x: 0, y: 0, z: 0 };
+    <div class="ui">
+      <h3>Hand Controller</h3>
+      <button id="btnConnect">Conectar WebSocket</button>
+      <div>WS: <span id="wsState">desconectado</span></div>
+      <label><input id="sendRaw" type="checkbox" /> enviar raw landmarks</label>
+      <label><input id="mirrorPreview" type="checkbox" checked /> espelhar preview</label>
+      <p><small>Se o websocket estiver offline, o cliente ainda mostra o overlay.</small></p>
+      <h4>Último pacote (resumo)</h4>
+      <pre id="last">nenhum</pre>
+      <p><small>Abra o servidor WS em ws://localhost:8080 (arquivo server.js).</small></p>
+    </div>
+  </div>
 
-        const videoWidth = 160;
-        const videoHeight = 120;
+<script>
+(() => {
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('overlay');
+  const ctx = canvas.getContext('2d');
+  const lastEl = document.getElementById('last');
+  const wsState = document.getElementById('wsState');
+  const btnConnect = document.getElementById('btnConnect');
+  const sendRawCheckbox = document.getElementById('sendRaw');
+  const mirrorCheckbox = document.getElementById('mirrorPreview');
 
-        // ----------------- FUNÇÃO SETUP -----------------
-        function setup() {
-            // Cria o canvas em modo WEBGL para renderização 3D
-            createCanvas(windowWidth, windowHeight, WEBGL);
-            
-            // Configura a webcam
-            video = createCapture(VIDEO);
-            video.size(videoWidth, videoHeight);
-            video.id('webcam'); // ID para o CSS
-            video.hide(); // Oculta o elemento de vídeo p5.js
+  let ws = null;
+  btnConnect.addEventListener('click', () => {
+    if (ws && ws.readyState === WebSocket.OPEN) { ws.close(); return; }
+    wsState.textContent = 'conectando...';
+    ws = new WebSocket('ws://localhost:8080');
+    ws.addEventListener('open', () => wsState.textContent = 'conectado');
+    ws.addEventListener('close', () => wsState.textContent = 'desconectado');
+    ws.addEventListener('error', () => wsState.textContent = 'erro');
+    ws.addEventListener('message', ev => {
+      // opcional: exibir mensagens do servidor
+      // console.log('from server', ev.data);
+    });
+  });
 
-            // Inicializa o modelo Handpose do ml5.js
-            handpose = ml5.handpose(video, modelReady);
+  // Mapeamento params (ajuste conforme necessário)
+  const SCALE_XY = 3.2;
+  const DEPTH_SCALE = 3.0;
+  const DEPTH_OFFSET = 0.12;
 
-            // Callback para atualizar as previsões
-            handpose.on('predict', results => {
-                predictions = results;
-            });
+  // Inicializa MediaPipe Hands
+  const hands = new Hands({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+  });
 
-            // Configura a perspectiva 3D
-            perspective(PI / 3.0, width / height, 0.1, 1000); 
-        }
+  hands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence: 0.6
+  });
 
-        function modelReady() {
-            console.log('Modelo Handpose carregado com sucesso!');
-            // Torna o elemento de vídeo visível no canto
-            select('#webcam').elt.style.display = 'block'; 
-        }
+  hands.onResults(onResults);
 
-        // ----------------- FUNÇÃO DRAW (LOOP PRINCIPAL) -----------------
-        function draw() {
-            // 1. Fundo Cinza
-            background(170);
+  // Inicia câmera
+  const camera = new Camera(video, {
+    onFrame: async () => { await hands.send({image: video}); },
+    width: 640,
+    height: 480
+  });
+  camera.start();
 
-            // Configurações de luz
-            ambientLight(100);
-            directionalLight(255, 255, 255, 0, 0, -1);
-            
-            // Rastreamento e Mapeamento
-            if (predictions.length > 0) {
-                let hand = predictions[0];
-                let landmarks = hand.landmarks;
+  function mapLandmark(lm, width, height) {
+    const x_px = lm.x * width;
+    const y_px = lm.y * height;
+    const z_rel = lm.z;
+    const nx = (x_px / width - 0.5) * SCALE_XY;
+    const nz = (0.5 - y_px / height) * SCALE_XY;
+    const ny = (-z_rel) * DEPTH_SCALE + DEPTH_OFFSET;
+    return { x: nx, y: ny, z: nz };
+  }
 
-                // Usa o ponto de referência do pulso (landmark 0) para controlar o cubo.
-                let wrist = landmarks[0];
-                
-                // Mapeamento X (Horizontal): Inverte X para movimento intuitivo.
-                // O mapeamento vai de 0 a 1 (normalizado) para a largura do canvas.
-                boxPosition.x = map(wrist[0], 0, 1, width / 2, -width / 2);
-                
-                // Mapeamento Y (Vertical): Inverte Y (p5.js Y é positivo para baixo)
-                boxPosition.y = map(wrist[1], 0, 1, -height / 2, height / 2);
-                
-                // 5. Mapeamento Eixo Z (Profundidade): Valores positivos do Z do MediaPipe significam mais perto da câmera.
-                // Mapeamos para o espaço 3D (ex: de -400 (longe) a 400 (perto)).
-                // Ajuste os valores -0.5 e 0.5 conforme a sensibilidade desejada.
-                boxPosition.z = map(wrist[2], -0.5, 0.5, -400, 400); 
-                
-                // -----------------------------------------------------
-                // 4. Desenha Mão Virtual (Bolinhas nas Articulações)
-                fill(255, 0, 0); // Cor vermelha para as bolinhas
-                noStroke();
-                
-                for (let i = 0; i < landmarks.length; i++) {
-                    let landmark = landmarks[i];
-                    
-                    // Converte as coordenadas do landmark para o espaço 3D do p5.js
-                    let x = map(landmark[0], 0, 1, width / 2, -width / 2);
-                    let y = map(landmark[1], 0, 1, -height / 2, height / 2);
-                    let z = map(landmark[2], -0.5, 0.5, -400, 400); 
-                    
-                    push();
-                    translate(x, y, z);
-                    sphere(5); // Desenha a bolinha
-                    pop();
-                }
-            }
-            
-            // -----------------------------------------------------
-            // 3. Desenha 1 Bloco (Cubo)
-            
-            push(); 
-            // O cubo segue a posição 3D mapeada do pulso
-            translate(boxPosition.x, boxPosition.y, boxPosition.z); 
-            
-            // Adiciona uma rotação suave para efeito visual
-            rotateX(frameCount * 0.005);
-            rotateY(frameCount * 0.005);
-            
-            normalMaterial(); // Material simples para o cubo
-            box(80); // Desenha um cubo (bloco)
-            pop(); 
-        }
-        
-        // Função para garantir que o canvas se adapte ao tamanho da janela
-        function windowResized() {
-            resizeCanvas(windowWidth, windowHeight);
-            perspective(PI / 3.0, width / height, 0.1, 1000); 
-        }
-    </script>
+  function drawMirrorImage(image) {
+    ctx.save();
+    if (mirrorCheckbox.checked) {
+      ctx.scale(-1,1);
+      ctx.drawImage(image, -canvas.width, 0, canvas.width, canvas.height);
+    } else {
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    }
+    ctx.restore();
+  }
+
+  function onResults(results) {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    if (results.image) drawMirrorImage(results.image);
+
+    if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+      lastEl.textContent = 'nenhuma mão';
+      return;
+    }
+
+    const landmarks = results.multiHandLandmarks[0];
+
+    // desenhar esqueleto / pontos
+    drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {color:'#00FF88', lineWidth:2});
+    drawLandmarks(ctx, landmarks, {color:'#FF0066', lineWidth:1});
+
+    // mapear landmarks
+    const mapped = landmarks.map(lm => mapLandmark(lm, canvas.width, canvas.height));
+
+    const payload = {
+      t: Date.now(),
+      landmarks: mapped
+    };
+
+    // enviar via WS se conectado
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      const out = sendRawCheckbox.checked ? { raw: landmarks } : payload;
+      ws.send(JSON.stringify(out));
+      wsState.textContent = 'conectado (enviando)';
+    }
+
+    // resumo para UI
+    lastEl.textContent = JSON.stringify({
+      t: payload.t,
+      l0: mapped[0],
+      l4: mapped[4],
+      l8: mapped[8]
+    }, null, 2);
+  }
+})();
+</script>
 </body>
 </html>
