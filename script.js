@@ -3,7 +3,6 @@ let handPoints = [];
 let cubes = [];
 let raycaster, mouse;
 let selectedCube = null;
-let controlsEnabled = false;
 
 function initThreeJS() {
   scene = new THREE.Scene();
@@ -45,6 +44,11 @@ function animate() {
 }
 
 function initMediaPipe() {
+  if (typeof Hands === 'undefined' || typeof Camera === 'undefined') {
+    console.error('MediaPipe Hands ou Camera não estão disponíveis.');
+    return;
+  }
+
   const videoElement = document.getElementById('input_video');
   const hands = new Hands({
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
