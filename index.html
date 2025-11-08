@@ -3,10 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Controlador de Mão 3D</title>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
-  </style>
+  <link rel="stylesheet" href="style.css" />
 
   <!-- MediaPipe Hands -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -16,7 +13,8 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
 </head>
 <body>
-  <video id="input_video" style="display:none;"></video>
+  <video id="input_video" autoplay muted playsinline></video>
+  <canvas id="three-canvas"></canvas>
   <script src="script.js"></script>
 </body>
 </html>
