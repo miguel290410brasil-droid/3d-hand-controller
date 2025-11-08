@@ -4,11 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Hand Controller - Webcam e Scripting</title>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/addons/p5.sound.min.js"></script>
-    <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
+    <script src="https://unpkg.com/ml5@0.12.2/dist/ml5.min.js"></script>
+
     <style>
-        /* Estilo simples para centralizar e garantir que o corpo ocupe toda a tela */
         body {
             margin: 0;
             padding: 0;
@@ -16,10 +17,10 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            overflow: hidden; /* Evita barras de rolagem */
-            background-color: #AAAAAA; /* Fundo Cinza para o BODY */
+            overflow: hidden;
+            background-color: #AAAAAA; /* Fundo Cinza (Nível Body) */
         }
-        /* Estilo para o vídeo da webcam, que fica visível, mas em uma posição discreta */
+        /* Estilo para a webcam no canto superior direito */
         #webcam {
             position: absolute;
             top: 10px;
@@ -28,9 +29,8 @@
             height: 120px;
             z-index: 10;
             border: 2px solid white;
-            transform: scaleX(-1); /* Espelha o vídeo para ser mais intuitivo */
+            transform: scaleX(-1); /* Espelha o vídeo para ser intuitivo */
         }
-        /* O canvas p5.js será o elemento principal da cena 3D */
         canvas {
             display: block;
         }
@@ -39,94 +39,76 @@
 <body>
 
     <script>
-        // Variáveis para p5.js e ml5.js
+        // Variáveis globais
         let handpose;
         let video;
         let predictions = [];
-
-        // Variável para a posição do cubo (bloco)
         let boxPosition = { x: 0, y: 0, z: 0 };
+
         const videoWidth = 160;
         const videoHeight = 120;
 
-        /**
-         * Função setup (Configuração Inicial)
-         */
+        // ----------------- FUNÇÃO SETUP -----------------
         function setup() {
-            // Cria o canvas usando WEBGL para renderização 3D
+            // Cria o canvas em modo WEBGL para renderização 3D
             createCanvas(windowWidth, windowHeight, WEBGL);
             
-            // 1. Configura o fundo cinza (embora o body já seja cinza, definimos o fundo do canvas também)
-            background(170); // Cinza (#AAAAAA)
-
-            // 2. Configura a webcam
+            // Configura a webcam
             video = createCapture(VIDEO);
-            video.size(videoWidth, videoHeight); // Define o tamanho para o feed do modelo
-            video.id('webcam'); // Atribui um ID para o CSS
-            video.hide(); // Oculta o elemento de vídeo p5.js, mas o CSS o torna visível separadamente
-            
-            // 3. Inicializa o modelo Handpose do ml5.js
+            video.size(videoWidth, videoHeight);
+            video.id('webcam'); // ID para o CSS
+            video.hide(); // Oculta o elemento de vídeo p5.js
+
+            // Inicializa o modelo Handpose do ml5.js
             handpose = ml5.handpose(video, modelReady);
 
-            // Quando o modelo detectar algo, armazena os resultados na variável 'predictions'
+            // Callback para atualizar as previsões
             handpose.on('predict', results => {
                 predictions = results;
             });
 
-            // Ajusta o modo da câmera/perspectiva
-            perspective(PI / 3.0, width / height, 0.1, 500); 
+            // Configura a perspectiva 3D
+            perspective(PI / 3.0, width / height, 0.1, 1000); 
         }
 
-        /**
-         * Função chamada quando o modelo ml5.js está pronto
-         */
         function modelReady() {
-            console.log('Modelo Handpose carregado!');
-            select('#webcam').elt.style.display = 'block'; // Mostra o elemento de vídeo (webcam no canto)
+            console.log('Modelo Handpose carregado com sucesso!');
+            // Torna o elemento de vídeo visível no canto
+            select('#webcam').elt.style.display = 'block'; 
         }
 
-        /**
-         * Função draw (Loop de Desenho)
-         */
+        // ----------------- FUNÇÃO DRAW (LOOP PRINCIPAL) -----------------
         function draw() {
             // 1. Fundo Cinza
             background(170);
 
-            // Configurações de luz e material para 3D
-            lights(); // Adiciona luz para ver o cubo
+            // Configurações de luz
             ambientLight(100);
             directionalLight(255, 255, 255, 0, 0, -1);
             
-            // 3. Desenha 1 Bloco (Cubo)
-            push(); // Salva o estado de transformação atual
-            translate(boxPosition.x, boxPosition.y, boxPosition.z); // Move o cubo
-            rotateX(frameCount * 0.01); // Pequena rotação para efeito 3D
-            rotateY(frameCount * 0.01);
-            normalMaterial(); // Material padrão
-            box(50); // Desenha um cubo de 50x50x50
-            pop(); // Restaura o estado de transformação
-
-            // 4. Desenha a Mão Virtual e 5. Eixo Z na Mão (bolinhas)
+            // Rastreamento e Mapeamento
             if (predictions.length > 0) {
                 let hand = predictions[0];
                 let landmarks = hand.landmarks;
 
-                // Usa o ponto do pulso (landmark 0) para controlar a posição do cubo
-                // Mapeia os valores 2D (x, y) e 3D (z) da mão para o espaço 3D do p5.js
-                // Lembre-se que as coordenadas x/y do MediaPipe são normalizadas de 0 a 1 e espelhadas (por isso -x)
-                
+                // Usa o ponto de referência do pulso (landmark 0) para controlar o cubo.
                 let wrist = landmarks[0];
                 
-                // Mapeamento X (horizontal): inverte X e ajusta o centro
+                // Mapeamento X (Horizontal): Inverte X para movimento intuitivo.
+                // O mapeamento vai de 0 a 1 (normalizado) para a largura do canvas.
                 boxPosition.x = map(wrist[0], 0, 1, width / 2, -width / 2);
-                // Mapeamento Y (vertical): inverte Y (porque o p5.js Y é para baixo)
-                boxPosition.y = map(wrist[1], 0, 1, -height / 2, height / 2);
-                // Mapeamento Z (profundidade): usa o Z do landmark. Valores positivos para mais perto.
-                // Multiplicamos por um fator (ex: -100) para ter um efeito visível de profundidade.
-                boxPosition.z = map(wrist[2], -0.5, 0.5, 200, -200); 
                 
-                // Desenha as bolinhas (pontos de referência)
-                fill(255, 0, 0); // Cor vermelha para as articulações
+                // Mapeamento Y (Vertical): Inverte Y (p5.js Y é positivo para baixo)
+                boxPosition.y = map(wrist[1], 0, 1, -height / 2, height / 2);
+                
+                // 5. Mapeamento Eixo Z (Profundidade): Valores positivos do Z do MediaPipe significam mais perto da câmera.
+                // Mapeamos para o espaço 3D (ex: de -400 (longe) a 400 (perto)).
+                // Ajuste os valores -0.5 e 0.5 conforme a sensibilidade desejada.
+                boxPosition.z = map(wrist[2], -0.5, 0.5, -400, 400); 
+                
+                // -----------------------------------------------------
+                // 4. Desenha Mão Virtual (Bolinhas nas Articulações)
+                fill(255, 0, 0); // Cor vermelha para as bolinhas
                 noStroke();
                 
                 for (let i = 0; i < landmarks.length; i++) {
@@ -135,30 +117,36 @@
                     // Converte as coordenadas do landmark para o espaço 3D do p5.js
                     let x = map(landmark[0], 0, 1, width / 2, -width / 2);
                     let y = map(landmark[1], 0, 1, -height / 2, height / 2);
-                    // O Z também é mapeado para o espaço 3D (usa o mesmo mapeamento de boxPosition.z ou similar)
-                    let z = map(landmark[2], -0.5, 0.5, 200, -200); 
+                    let z = map(landmark[2], -0.5, 0.5, -400, 400); 
                     
                     push();
                     translate(x, y, z);
-                    sphere(5); // Desenha uma esfera (bolinha)
+                    sphere(5); // Desenha a bolinha
                     pop();
                 }
             }
-
-            // Exibe o feed da webcam (opcional, já está visível no canto via CSS)
-            // Para mostrar o vídeo no 3D:
-            // texture(video);
-            // plane(videoWidth, videoHeight); // Desenha o vídeo como uma textura em um plano
+            
+            // -----------------------------------------------------
+            // 3. Desenha 1 Bloco (Cubo)
+            
+            push(); 
+            // O cubo segue a posição 3D mapeada do pulso
+            translate(boxPosition.x, boxPosition.y, boxPosition.z); 
+            
+            // Adiciona uma rotação suave para efeito visual
+            rotateX(frameCount * 0.005);
+            rotateY(frameCount * 0.005);
+            
+            normalMaterial(); // Material simples para o cubo
+            box(80); // Desenha um cubo (bloco)
+            pop(); 
         }
         
-        /**
-         * Ajusta o canvas quando a janela é redimensionada
-         */
+        // Função para garantir que o canvas se adapte ao tamanho da janela
         function windowResized() {
             resizeCanvas(windowWidth, windowHeight);
-            perspective(PI / 3.0, width / height, 0.1, 500); 
+            perspective(PI / 3.0, width / height, 0.1, 1000); 
         }
-
     </script>
 </body>
 </html>
