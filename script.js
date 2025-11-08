@@ -4,14 +4,13 @@ const container = document.getElementById('container-3d');
 let scene, camera, renderer, gridHelper, handMesh, cubes = [];
 const RAYCASTER = new THREE.Raycaster();
 const HAND_RADIUS = 0.5; // Raio da esfera que representa a mão
-let cameraMediaPipe; // Variável global para o CameraUtils do MediaPipe
-let hands; // Variável global para o MediaPipe Hands
+let cameraMediaPipe; 
 
 function initThreeJS() {
     // 1. Cena e Câmera
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 1.5, 5); // Posição para visualizar a cena
+    camera.position.set(0, 1.5, 5);
     camera.lookAt(0, 0, 0);
 
     // 2. Renderizador
@@ -25,17 +24,17 @@ function initThreeJS() {
     scene.add(light);
     scene.add(new THREE.AmbientLight(0x404040));
 
-    // 4. Fundo Cinza 3D (Plano de Fundo) e Grid Helper
+    // 4. Fundo Cinza 3D e Grid
     scene.background = new THREE.Color(0x303030); 
     gridHelper = new THREE.GridHelper(20, 20, 0x555555, 0x555555);
     scene.add(gridHelper);
 
-    // 5. Mão Virtual (Esfera no Dedo Indicador)
+    // 5. Mão Virtual
     const handGeometry = new THREE.SphereGeometry(HAND_RADIUS / 2, 32, 32);
     const handMaterial = new THREE.MeshPhongMaterial({ color: 0x00c3ff, transparent: true, opacity: 0.7 });
     handMesh = new THREE.Mesh(handGeometry, handMaterial);
     scene.add(handMesh);
-    handMesh.visible = false; // Começa invisível
+    handMesh.visible = false;
 
     // 6. Cubos Interativos
     createCubes();
@@ -43,7 +42,7 @@ function initThreeJS() {
     window.addEventListener('resize', onWindowResize);
     animate();
     
-    // 🟢 CHAMAR A FUNÇÃO DE INICIALIZAÇÃO DO MEDIAPIPE
+    // Inicia o rastreamento MediaPipe
     initMediaPipe(); 
 }
 
@@ -61,7 +60,7 @@ function createCubes() {
         const material = new THREE.MeshPhongMaterial({ color: Math.random() * 0xffffff });
         const cube = new THREE.Mesh(geometry, material);
         cube.position.copy(positions[i]);
-        cube.initialColor = material.color.getHex(); // Salva a cor original
+        cube.initialColor = material.color.getHex();
         cube.isGrabbed = false;
         scene.add(cube);
         cubes.push(cube);
@@ -85,8 +84,8 @@ function animate() {
 const videoElement = document.getElementById('webcam-feed');
 
 function initMediaPipe() {
-    // Configuração e inicialização do MediaPipe Hands
-    hands = new Hands({
+    // 🟢 CORREÇÃO: A variável 'hands' agora é declarada localmente dentro da função
+    const hands = new Hands({
         locateFile: (file) => {
             return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469408/${file}`;
         }
@@ -99,9 +98,9 @@ function initMediaPipe() {
         minTrackingConfidence: 0.8
     });
 
-    hands.onResults(onResults); // Função chamada a cada quadro com resultados
+    hands.onResults(onResults);
 
-    // Inicialização do CAMERA UTILS
+    // Inicialização da Câmera (Isso deve ligar a webcam na caixa azul)
     cameraMediaPipe = new Camera(videoElement, {
         onFrame: async () => {
             await hands.send({ image: videoElement });
@@ -117,7 +116,7 @@ function initMediaPipe() {
 
 function onResults(results) {
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        handMesh.visible = true;
+        handMesh.visible = true; // Mão virtual (esfera azul) aparece!
         const handLandmarks = results.multiHandLandmarks[0];
         
         // 8 é o índice da ponta do dedo indicador
@@ -136,7 +135,7 @@ function onResults(results) {
         // Atualiza a posição da Mão Virtual
         handMesh.position.lerp(vector, 0.5); 
         
-        // Lógica de Pegar (Grab/Pinch) - Distância entre polegar (4) e indicador (8)
+        // Lógica de Pegar (Grab/Pinch)
         const tipThumb = handLandmarks[4];
         const distance = Math.hypot(tipIndexFinger.x - tipThumb.x, tipIndexFinger.y - tipThumb.y);
         const isGrabbing = distance < 0.05; 
@@ -145,7 +144,6 @@ function onResults(results) {
 
     } else {
         handMesh.visible = false;
-        // Solta qualquer cubo que estava sendo segurado
         cubes.forEach(cube => {
             if (cube.isGrabbed) {
                 cube.isGrabbed = false;
@@ -159,26 +157,21 @@ function handleCubeInteraction(isGrabbing) {
     let grabbedCube = cubes.find(c => c.isGrabbed);
 
     if (grabbedCube) {
-        // Se já estamos segurando um cubo, ele segue a mão
         grabbedCube.position.copy(handMesh.position);
-        grabbedCube.material.color.setHex(0xff0000); // Fica vermelho ao segurar
+        grabbedCube.material.color.setHex(0xff0000); 
         return; 
     }
 
-    // Se não estamos segurando, verificamos se podemos pegar um
     if (isGrabbing) {
-        // Verifica a colisão entre a mão e os cubos
         for (const cube of cubes) {
             const distance = handMesh.position.distanceTo(cube.position);
             
-            // Se a mão estiver próxima o suficiente do cubo para colidir
             if (distance < HAND_RADIUS) { 
                 cube.isGrabbed = true;
-                break; // Pega o primeiro cubo encontrado
+                break; 
             }
         }
     } else {
-        // Garante que o cubo solto volte à cor original
         cubes.forEach(cube => {
             if (cube.isGrabbed) {
                 cube.isGrabbed = false;
@@ -188,7 +181,7 @@ function handleCubeInteraction(isGrabbing) {
     }
 }
 
-// 🟢 CORREÇÃO FINAL: Garante que o MediaPipe e Three.js rodem APÓS o carregamento total do HTML
+// 🟢 CORREÇÃO FINAL: Garante que o Three.js comece após o carregamento total do HTML
 document.addEventListener('DOMContentLoaded', (event) => {
     initThreeJS();
 });
