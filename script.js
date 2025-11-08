@@ -5,6 +5,7 @@ let scene, camera, renderer, gridHelper, handMesh, cubes = [];
 const RAYCASTER = new THREE.Raycaster();
 const HAND_RADIUS = 0.5; // Raio da esfera que representa a mão
 let cameraMediaPipe; // Variável global para o CameraUtils do MediaPipe
+let hands; // Variável global para o MediaPipe Hands
 
 function initThreeJS() {
     // 1. Cena e Câmera
@@ -42,7 +43,7 @@ function initThreeJS() {
     window.addEventListener('resize', onWindowResize);
     animate();
     
-    // 🟢 CHAMAR A FUNÇÃO DE INICIALIZAÇÃO DO MEDIAPIPE AQUI
+    // 🟢 CHAMAR A FUNÇÃO DE INICIALIZAÇÃO DO MEDIAPIPE
     initMediaPipe(); 
 }
 
@@ -82,14 +83,11 @@ function animate() {
 // --- 2. CONFIGURAÇÃO DO RASTREAMENTO DE MÃO (MEDIAPIPE) ---
 
 const videoElement = document.getElementById('webcam-feed');
-let hands; // Mantenha a declaração fora da função
-
 
 function initMediaPipe() {
     // Configuração e inicialização do MediaPipe Hands
     hands = new Hands({
         locateFile: (file) => {
-            // Este path é correto, mas o erro indica que a classe Hands não foi carregada
             return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469408/${file}`;
         }
     });
@@ -103,7 +101,7 @@ function initMediaPipe() {
 
     hands.onResults(onResults); // Função chamada a cada quadro com resultados
 
-    // INICIALIZAÇÃO CORRIGIDA DO CAMERA UTILS
+    // Inicialização do CAMERA UTILS
     cameraMediaPipe = new Camera(videoElement, {
         onFrame: async () => {
             await hands.send({ image: videoElement });
@@ -125,8 +123,8 @@ function onResults(results) {
         // 8 é o índice da ponta do dedo indicador
         const tipIndexFinger = handLandmarks[8];
         
-        // Mapeamento das coordenadas 2D (do vídeo) para coordenadas 3D (do mundo Three.js)
-        const screenX = 1 - tipIndexFinger.x; // Inverte X (webcam espelhada)
+        // Mapeamento das coordenadas 2D para 3D
+        const screenX = 1 - tipIndexFinger.x; 
         const screenY = tipIndexFinger.y;
 
         const vector = new THREE.Vector3(
@@ -136,12 +134,12 @@ function onResults(results) {
         );
 
         // Atualiza a posição da Mão Virtual
-        handMesh.position.lerp(vector, 0.5); // Movimento suave (lerp)
+        handMesh.position.lerp(vector, 0.5); 
         
         // Lógica de Pegar (Grab/Pinch) - Distância entre polegar (4) e indicador (8)
         const tipThumb = handLandmarks[4];
         const distance = Math.hypot(tipIndexFinger.x - tipThumb.x, tipIndexFinger.y - tipThumb.y);
-        const isGrabbing = distance < 0.05; // Distância limite para "pegar"
+        const isGrabbing = distance < 0.05; 
 
         handleCubeInteraction(isGrabbing);
 
@@ -176,7 +174,7 @@ function handleCubeInteraction(isGrabbing) {
             // Se a mão estiver próxima o suficiente do cubo para colidir
             if (distance < HAND_RADIUS) { 
                 cube.isGrabbed = true;
-                break; // Pega o primeiro cubo encontrado e sai do loop
+                break; // Pega o primeiro cubo encontrado
             }
         }
     } else {
@@ -190,5 +188,7 @@ function handleCubeInteraction(isGrabbing) {
     }
 }
 
-// 🟢 CHAMADA FINAL: Inicia apenas o Three.js, que por sua vez inicia o MediaPipe
-initThreeJS();
+// 🟢 CORREÇÃO FINAL: Garante que o MediaPipe e Three.js rodem APÓS o carregamento total do HTML
+document.addEventListener('DOMContentLoaded', (event) => {
+    initThreeJS();
+});
