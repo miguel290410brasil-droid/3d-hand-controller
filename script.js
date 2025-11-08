@@ -16,7 +16,8 @@ window.addEventListener('resize', resizeCanvas);
 
 // Cria a instância do Hands
 const hands = new Hands({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    // Adapta o path para a nova URL estável
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469408/${file}`
 });
 
 // Define as opções do modelo
@@ -37,11 +38,8 @@ function onResults(results) {
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-    // Desenha a imagem do vídeo (apenas para debug, se necessário)
-    // canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-
     if (results.multiHandLandmarks) {
-        for (const landmarks of results.multiHandLandmarks) {
+        for (const landmarks of results.multiHandlandmarks) {
             // Desenha as bolinhas nos pontos da mão (landmarks)
             drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 5 });
             drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 2 });
