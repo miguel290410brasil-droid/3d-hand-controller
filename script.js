@@ -84,7 +84,7 @@ function animate() {
 const videoElement = document.getElementById('webcam-feed');
 
 function initMediaPipe() {
-    // 🟢 CORREÇÃO: A variável 'hands' agora é declarada localmente dentro da função
+    // A variável 'hands' é declarada localmente dentro da função
     const hands = new Hands({
         locateFile: (file) => {
             return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469408/${file}`;
@@ -100,7 +100,7 @@ function initMediaPipe() {
 
     hands.onResults(onResults);
 
-    // Inicialização da Câmera (Isso deve ligar a webcam na caixa azul)
+    // Inicialização da Câmera
     cameraMediaPipe = new Camera(videoElement, {
         onFrame: async () => {
             await hands.send({ image: videoElement });
@@ -116,7 +116,7 @@ function initMediaPipe() {
 
 function onResults(results) {
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        handMesh.visible = true; // Mão virtual (esfera azul) aparece!
+        handMesh.visible = true;
         const handLandmarks = results.multiHandLandmarks[0];
         
         // 8 é o índice da ponta do dedo indicador
@@ -181,7 +181,9 @@ function handleCubeInteraction(isGrabbing) {
     }
 }
 
-// 🟢 CORREÇÃO FINAL: Garante que o Three.js comece após o carregamento total do HTML
+// 🟢 CORREÇÃO FINAL: Usa um delay para garantir que as bibliotecas estejam 100% prontas.
 document.addEventListener('DOMContentLoaded', (event) => {
-    initThreeJS();
+    setTimeout(() => {
+        initThreeJS();
+    }, 1000); // 1 segundo de atraso
 });
