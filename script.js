@@ -41,6 +41,9 @@ function initThreeJS() {
 
     window.addEventListener('resize', onWindowResize);
     animate();
+    
+    // 🟢 CHAMAR A FUNÇÃO DE INICIALIZAÇÃO DO MEDIAPIPE AQUI
+    initMediaPipe(); 
 }
 
 function createCubes() {
@@ -79,33 +82,37 @@ function animate() {
 // --- 2. CONFIGURAÇÃO DO RASTREAMENTO DE MÃO (MEDIAPIPE) ---
 
 const videoElement = document.getElementById('webcam-feed');
+let hands; // Mantenha a declaração fora da função
 
-// Configuração e inicialização do MediaPipe Hands
-const hands = new Hands({
-    locateFile: (file) => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469408/${file}`;
-    }
-});
 
-hands.setOptions({
-    maxNumHands: 1,
-    modelComplexity: 1,
-    minDetectionConfidence: 0.8,
-    minTrackingConfidence: 0.8
-});
+function initMediaPipe() {
+    // Configuração e inicialização do MediaPipe Hands
+    hands = new Hands({
+        locateFile: (file) => {
+            // Este path é correto, mas o erro indica que a classe Hands não foi carregada
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469408/${file}`;
+        }
+    });
 
-hands.onResults(onResults); // Função chamada a cada quadro com resultados
+    hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.8,
+        minTrackingConfidence: 0.8
+    });
 
-// 🟢 INICIALIZAÇÃO CORRIGIDA DO CAMERA UTILS
-// A classe 'Camera' é fornecida pela biblioteca 'camera_utils.js' carregada no index.html
-cameraMediaPipe = new Camera(videoElement, {
-    onFrame: async () => {
-        await hands.send({ image: videoElement });
-    },
-    width: 640,
-    height: 480
-});
-cameraMediaPipe.start();
+    hands.onResults(onResults); // Função chamada a cada quadro com resultados
+
+    // INICIALIZAÇÃO CORRIGIDA DO CAMERA UTILS
+    cameraMediaPipe = new Camera(videoElement, {
+        onFrame: async () => {
+            await hands.send({ image: videoElement });
+        },
+        width: 640,
+        height: 480
+    });
+    cameraMediaPipe.start();
+}
 
 
 // --- 3. LÓGICA DE INTERAÇÃO (RASTREAMENTO + 3D) ---
@@ -183,5 +190,5 @@ function handleCubeInteraction(isGrabbing) {
     }
 }
 
-// Inicializa a cena 3D após a definição das funções
+// 🟢 CHAMADA FINAL: Inicia apenas o Three.js, que por sua vez inicia o MediaPipe
 initThreeJS();
