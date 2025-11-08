@@ -16,7 +16,6 @@ window.addEventListener('resize', resizeCanvas);
 
 // Cria a instância do Hands
 const hands = new Hands({
-    // Adapta o path para a nova URL estável
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469408/${file}`
 });
 
@@ -39,8 +38,9 @@ function onResults(results) {
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
     if (results.multiHandLandmarks) {
-        for (const landmarks of results.multiHandlandmarks) {
+        for (const landmarks of results.multiHandLandmarks) {
             // Desenha as bolinhas nos pontos da mão (landmarks)
+            // drawConnectors e drawLandmarks são funções globais do MediaPipe
             drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 5 });
             drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 2 });
         }
@@ -49,14 +49,15 @@ function onResults(results) {
 }
 
 
-// --- 3. INICIALIZAÇÃO DA CÂMERA ---
+// --- 3. INICIALIZAÇÃO DA CÂMERA (COM CORREÇÃO DE TIMEOUT) ---
 
-// Usa a classe Camera do MediaPipe para ligar o vídeo e enviar os quadros
 const camera = new Camera(videoElement, {
     onFrame: async () => {
         await hands.send({ image: videoElement });
     },
     width: 1280,
-    height: 720
+    height: 720,
+    // 🟢 CORREÇÃO: Aumenta o tempo limite para 5 segundos
+    timeout: 5000 
 });
 camera.start();
