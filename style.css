@@ -1,44 +1,19 @@
 body {
-    margin: 0;
-    padding: 0;
-    font-family: Arial, sans-serif;
-    text-align: center;
-    /* Fundo Cinza Quase 3D */
-    background-color: #303030; 
-    color: #ffffff;
-    overflow: hidden; /* Remove barras de rolagem desnecessárias */
+  margin: 0;
+  overflow: hidden;
+  background-color: #1e1e1e;
 }
 
-h1 {
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 10;
-    color: #f0f0f0;
-    text-shadow: 1px 1px 2px #000000;
+#input_video {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 200px;
+  height: 150px;
+  border: 2px solid #fff;
+  z-index: 10;
 }
 
-/* Container para a cena Three.js */
-#container-3d {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1;
-}
-
-/* Webcam pequena no canto (elemento de entrada de dados) */
-#webcam-feed {
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    width: 240px; 
-    height: 180px;
-    border: 3px solid #00c3ff;
-    border-radius: 8px;
-    z-index: 5;
-    /* Espelha a imagem da webcam para rastreamento mais natural */
-    transform: scaleX(-1); 
+canvas {
+  display: block;
 }
